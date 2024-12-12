@@ -1,15 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shaggy's German Graph</title>
-    <link rel="stylesheet" href="style.css">
-    
-</head>
-<body> <H1>German graph</H1> 
-<div id="my_dataviz"></div>
-    <div id="viz" />
-<script src="testgraph1.js"></script>
+<meta charset="utf-8">
+<title>Shaggy's german graph'</title>
+<link rel="stylesheet" type="text/css" href="./inspector.css">
+<body>
+<script type="module">
+
+import define from "./index.js";
+import {Runtime, Library, Inspector} from "./runtime.js";
+
+const runtime = new Runtime();
+const main = runtime.module(define, Inspector.into(document.body));
+
+</script>
 </body>
 </html>

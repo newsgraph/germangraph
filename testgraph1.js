@@ -1,219 +1,59 @@
-//Notes:
-// Src: http://bl.ocks.org/mbostock/1093130
-//Notes:
-// * Each dom element is using 
-//   children to store refs to expanded children
-//   _children to store refs to collapsed children
-//* It's using both a tree and a graph layout.
+ipt>
 
-//root 
-var g = {
-    data: null,
-    force:null
-};
+// set the dimensions and margins of the graph
+var margin = {top: 10, right: 30, bottom: 30, left: 40},
+  width = 400 - margin.left - margin.right,
+  height = 400 - margin.top - margin.bottom;
 
-$(function () {
+// append the svg object to the body of the page
+var svg = d3.select("#my_dataviz")
+.append("svg")
+  .attr("width", width + margin.left + margin.right)
+  .attr("height", height + margin.top + margin.bottom)
+.append("g")
+  .attr("transform",
+        "translate(" + margin.left + "," + margin.top + ")");
 
-    //use a global var for the data:
-    g.data = data;
+d3.json("trialdata.json", function( data) {
 
+  // Initialize the links
+  var link = svg
+    .selectAll("line")
+    .data(data.links)
+    .enter()
+    .append("line")
+      .style("stroke", "#aaa")
 
-    var width = 960,
-        height = 500;
+  // Initialize the nodes
+  var node = svg
+    .selectAll("circle")
+    .data(data.nodes)
+    .enter()
+    .append("circle")
+      .attr("r", 20)
+      .style("fill", "#69b3a2")
 
-    //Create a sized SVG surface within viz:
-    var svg = d3.select("#viz")
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height);
+  // Let's list the force we wanna apply on the network
+  var simulation = d3.forceSimulation(data.nodes)                 // Force algorithm is applied to data.nodes
+      .force("link", d3.forceLink()                               // This force provides links between nodes
+            .id(function(d) { return d.id; })                     // This provide  the id of a node
+            .links(data.links)                                    // and this the list of links
+      )
+      .force("charge", d3.forceManyBody().strength(-400))         // This adds repulsion between nodes. Play with the -400 for the repulsion strength
+      .force("center", d3.forceCenter(width / 2, height / 2))     // This force attracts nodes to the center of the svg area
+      .on("end", ticked);
 
+  // This function is run at each iteration of the force algorithm, updating the nodes position.
+  function ticked() {
+    link
+        .attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
 
-    g.link = svg.selectAll(".link"),
-    g.node = svg.selectAll(".node");
-
-    //Create a graph layout engine:
-    g.force = d3.layout.force()
-        .linkDistance(80)
-        .charge(-120)
-        .gravity(0.05)
-        .size([width, height])
-    //that invokes the tick method to draw the elements in their new location:
-    .on("tick", tick);
-
-
-
-    //Draw the graph:
-    //Note that this method is invoked again
-    //when clicking nodes:
-    update();
-
+    node
+         .attr("cx", function (d) { return d.x+6; })
+         .attr("cy", function(d) { return d.y-6; });
+  }
 
 });
-
-
-
-
-
-
-
-//invoked once at the start, 
-//and again when from 'click' method
-//which expands and collapses a node.
-
-function update() {
-
-    //iterate through original nested data, and get one dimension array of nodes.
-    var nodes = flatten(g.data);
-
-    //Each node extracted above has a children attribute.
-    //from them, we can use a tree() layout function in order
-    //to build a links selection.
-    var links = d3.layout.tree().links(nodes);
-
-    // pass both of those sets to the graph layout engine, and restart it
-    g.force.nodes(nodes)
-        .links(links)
-        .start();
-
-    //-------------------
-    // create a subselection, wiring up data, using a function to define 
-    //how it's suppossed to know what is appended/updated/exited
-    g.link = g.link.data(links, function (d) {return d.target.id;});
-
-    //Get rid of old links:
-    g.link.exit().remove();
-
-    //Build new links by adding new svg lines:
-    g.link
-        .enter()
-        .insert("line", ".node")
-        .attr("class", "link");
-
-    // create a subselection, wiring up data, using a function to define 
-    //how it's suppossed to know what is appended/updated/exited
-    g.node = g.node.data(nodes, function (d) {return d.id;});
-    //Get rid of old nodes:  
-    g.node.exit().remove();
-    //-------------------
-    //create new nodes by making groupd elements, that contain circls and text:
-    var nodeEnter = g.node.enter()
-        .append("g")
-        .attr("class", "node")
-        .on("click", click)
-        .call(g.force.drag);
-    //circle within the single node group:
-    nodeEnter.append("circle")
-        .attr("r", function (d) {return Math.sqrt(d.size) / 10 || 4.5;});
-    //text within the single node group:
-    nodeEnter.append("text")
-        .attr("dy", ".35em")
-        .text(function (d) {
-        return d.name;
-    });
-    //All nodes, do the following:
-    g.node.select("circle")
-        .style("fill", color); //calls delegate
-    //-------------------
-}
-
-
-// Invoked from 'update'.
-// The original source data is not the usual nodes + edge list,
-// but that's what's needed for the force layout engine. 
-// So returns a list of all nodes under the root.
-function flatten(data) {
-    var nodes = [],
-        i = 0;
-    //count only children (not _children)
-    //note that it doesn't count any descendents of collapsed _children 
-    //rather elegant?
-    function recurse(node) {
-        if (node.children) node.children.forEach(recurse);
-        if (!node.id) node.id = ++i;
-        nodes.push(node);
-    }
-    recurse(data);
-
-    //Done:
-    return nodes;
-}
-
-
-
-//Invoked from 'update'
-//Return the color of the node
-//based on the children value of the 
-//source data item: {name=..., children: {...}}
-function color(d) {
-    return d._children ? "#319756" // collapsed package
-    :
-    d.children ? "#c64365" // expanded package
-    :
-        "#fd233c"; // leaf node
-}
-
-
-
-
-
-
-// Toggle children on click by switching around values on _children and children.
-function click(d) {
-    if (d3.event.defaultPrevented) return; // ignore drag
-    if (d.children) {
-        d._children = d.children;
-        d.children = null;
-    } else {
-        d.children = d._children;
-        d._children = null;
-    }
-    //
-    update();
-}
-
-
-
-
-
-//event handler for every time the force layout engine
-//says to redraw everthing:
-function tick() {
-    //redraw position of every link within the link set:
-    g.link.attr("x1", function (d) {
-        return d.source.x;
-    })
-        .attr("y1", function (d) {
-        return d.source.y;
-    })
-        .attr("x2", function (d) {
-        return d.target.x;
-    })
-        .attr("y2", function (d) {
-        return d.target.y;
-    });
-    //same for the nodes, using a functor:
-    g.node.attr("transform", function (d) {
-        return "translate(" + d.x + "," + d.y + ")";
-    });
-}
-
-
-
-
-var data =
-
-{ name: "haben",    
-
- children: [{ name: "anhaben"}, 
- {name: "dahaben"}, 
-{ name: "vorhaben"},
-{ name: "guthaben"},
-{ name: "mithaben"},
-{ name: "liebhaben"},
-{ name: "innehaben"},
-{ name: "gernhaben"},
-{ name: "handhaben"},
-{ name: "satthaben"},
-{ name: "teilhaben"}, 
- { name: "dabeihaben"}]
-};
